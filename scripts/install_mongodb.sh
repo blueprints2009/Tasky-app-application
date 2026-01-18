@@ -66,27 +66,4 @@ systemctl status mongod --no-pager
 
 echo "MongoDB installation completed successfully!"
 echo "MongoDB version:"
-mongod --version
-
-
-# Wait for MongoDB to be ready
-echo "Waiting for MongoDB to initialize..."
-sleep 10
-
-# 4. Configure Admin User and Enable Authentication
-echo "Configuring MongoDB Admin User..."
-# Change these values or use environment variables!
-ADMIN_USER="admin"
-ADMIN_PASS="password!"
-
-mongosh --eval "
-db = db.getSiblingDB('admin');
-db.createUser({
-  user: '$ADMIN_USER',
-  pwd: '$ADMIN_PASS',
-  roles: [{ role: 'userAdminAnyDatabase', db: 'admin' }, 'readWriteAnyDatabase']
-});"
-# Enable authorization in mongod.conf
-sed -i 's/#security:/security:\n  authorization: enabled/' /etc/mongod.conf
-# Restart MongoDB to apply changes
-systemctl restart mongod    
+mongod --version 
