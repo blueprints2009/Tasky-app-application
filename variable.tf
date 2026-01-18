@@ -49,7 +49,7 @@ variable "environment" {
 variable "instance_type" {
   description = "EC2 instance type for MongoDB server"
   type        = string
-  default     = "t3.small"
+  default     = "t3.medium"
 }
 
 variable "backend_bucket" {
