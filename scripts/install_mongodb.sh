@@ -5,7 +5,7 @@ echo "Starting MongoDB installation..."
 
 # Update system packages
 apt-get update
-apt-get install -y gnupg curl wget unzip
+apt-get install -y gnupg curl wget awscli
 
 # Import MongoDB public GPG key
 curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | \
@@ -33,8 +33,13 @@ echo "Configuring MongoDB network settings..."
 # Backup config
 cp /etc/mongod.conf /etc/mongod.conf.bak
 
-# Configure net section to allow outside connections
+# Configure net section safely
 if grep -q "^net:" /etc/mongod.conf; then
+  # Ensure port exists
+  grep -q "^[[:space:]]*port:" /etc/mongod.conf || \
+    sed -i '/^net:/a\  port: 27017' /etc/mongod.conf
+
+  # Replace or add bindIp
   if grep -q "^[[:space:]]*bindIp:" /etc/mongod.conf; then
     sed -i 's/^[[:space:]]*bindIp:.*/  bindIp: 0.0.0.0/' /etc/mongod.conf
   else
@@ -42,45 +47,23 @@ if grep -q "^net:" /etc/mongod.conf; then
   fi
 else
   cat <<EOF >> /etc/mongod.conf
+
 net:
   port: 27017
   bindIp: 0.0.0.0
 EOF
 fi
 
-# --- NEW: CREATE ADMIN USER ---
-echo "Creating MongoDB admin user..."
-# Set variables (defaults if not provided)
-ADMIN_USER="${MONGO_ADMIN_USER:-admin}"
-ADMIN_PASS="${MONGO_ADMIN_PASSWORD:-$(openssl rand -base64 24)}"
-
-# Use mongosh to create the user
-mongosh admin --eval "
-db.createUser({
-  user: '$ADMIN_USER',
-  pwd: '$ADMIN_PASS',
-  roles: [ { role: 'userAdminAnyDatabase', db: 'admin' }, 'readWriteAnyDatabase' ]
-})"
-
-# Save credentials to a file for your reference
-echo "User: $ADMIN_USER | Pass: $ADMIN_PASS" > /root/mongodb_credentials.txt
-chmod 600 /root/mongodb_credentials.txt
-
-# --- NEW: ENABLE AUTHENTICATION ---
-echo "Enabling RBAC Authorization..."
-if grep -q "^security:" /etc/mongod.conf; then
-    sed -i '/^security:/a\  authorization: enabled' /etc/mongod.conf
-else
-    cat <<EOF >> /etc/mongod.conf
-security:
-  authorization: enabled
-EOF
-fi
-
-# Restart MongoDB to apply security settings
+# Restart MongoDB to apply changes
 systemctl restart mongod
 
-echo "--------------------------------------------------"
-echo "MongoDB Security Enabled!"
-echo "Credentials saved to /root/mongodb_credentials.txt"
-echo "--------------------------------------------------"
+# Verify MongoDB is listening
+echo "MongoDB listening status:"
+ss -lntp | grep 27017 || true
+
+echo "MongoDB status:"
+systemctl status mongod --no-pager
+
+echo "MongoDB installation completed successfully!"
+echo "MongoDB version:"
+mongod --version
